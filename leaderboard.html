@@ -74,23 +74,54 @@
   .winner-anim::before {
     content: "";
     position: absolute;
-    top: -50px;
+    top: -80px;
     left: 50%;
-    width: 600px;
-    height: 600px;
+    width: 700px;
+    height: 700px;
     transform: translateX(-50%);
     background: radial-gradient(circle, rgba(255,255,200,0.25), transparent 70%);
     filter: blur(40px);
     animation: glowPulse 4s ease-in-out infinite;
   }
 
+  /* ROTUJÍCÍ KORUNA */
+  .crown {
+    font-size: 4rem;
+    position: absolute;
+    top: -80px;
+    left: 50%;
+    transform: translateX(-50%) rotateX(25deg);
+    animation: crownFloat 3s ease-in-out infinite, crownSpin 6s linear infinite;
+    filter: drop-shadow(0 0 20px rgba(255,215,0,0.6));
+  }
+
+  @keyframes crownFloat {
+    0%, 100% { transform: translateX(-50%) translateY(0) rotateX(25deg); }
+    50%      { transform: translateX(-50%) translateY(-12px) rotateX(25deg); }
+  }
+
+  @keyframes crownSpin {
+    0%   { transform: translateX(-50%) translateY(0) rotateX(25deg) rotateY(0deg); }
+    100% { transform: translateX(-50%) translateY(0) rotateX(25deg) rotateY(360deg); }
+  }
+
+  /* Winner text */
   .winner-name {
     font-size: 3.6rem;
     font-weight: 700;
     color: white;
     opacity: 0;
     animation: softPop 1.6s ease forwards, pulse 3s ease-in-out infinite 1.6s;
-    text-shadow: 0 0 35px rgba(255,255,200,0.4), 0 0 60px rgba(255,255,200,0.2);
+    text-shadow:
+      0 0 25px rgba(255,255,200,0.4),
+      0 0 60px rgba(255,255,200,0.2),
+      0 0 90px rgba(255,255,200,0.15);
+    transform-style: preserve-3d;
+  }
+
+  /* 3D POP-OUT */
+  .winner-name {
+    transform: perspective(600px) translateZ(40px);
   }
 
   .winner-emojis {
@@ -137,9 +168,9 @@
   }
 
   @keyframes softPop {
-    0%   { transform: scale(0.5); opacity: 0; }
-    60%  { transform: scale(1.12); opacity: 1; }
-    100% { transform: scale(1); }
+    0%   { transform: scale(0.5) perspective(600px) translateZ(0); opacity: 0; }
+    60%  { transform: scale(1.12) perspective(600px) translateZ(40px); opacity: 1; }
+    100% { transform: scale(1) perspective(600px) translateZ(40px); }
   }
 
   @keyframes floatUp {
@@ -148,8 +179,8 @@
   }
 
   @keyframes pulse {
-    0%, 100% { transform: scale(1); }
-    50%      { transform: scale(1.05); }
+    0%, 100% { transform: perspective(600px) translateZ(40px) scale(1); }
+    50%      { transform: perspective(600px) translateZ(60px) scale(1.06); }
   }
 
   @keyframes glowPulse {
@@ -281,6 +312,7 @@ function showWinner(poll) {
   if (winners.length > 1) {
     document.body.innerHTML = `
       <div class="winner-anim">
+        <div class="crown">👑</div>
         <div class="winner-name" style="font-size:2.6rem; opacity:0.9;">
           REMÍZA 🎉
         </div>
@@ -298,6 +330,7 @@ function showWinner(poll) {
 
   document.body.innerHTML = `
     <div class="winner-anim">
+      <div class="crown">👑</div>
       <div class="winner-name">${winner}</div>
       <div class="winner-emojis">🎉✨🏆</div>
     </div>
