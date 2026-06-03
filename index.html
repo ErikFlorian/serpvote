@@ -392,8 +392,12 @@
     <div class="info-box">Zadej heslo a Firebase config pro správu ankety.</div>
     <div class="setup-label">Admin heslo</div>
     <input type="password" id="adminPassword" placeholder="Tvoje heslo">
+    <div class="setup-label">Firebase Database URL</div>
+    <input type="text" id="firebaseUrl" placeholder="https://xxx-default-rtdb.europe-west1.firebasedatabase.app">
+    <div class="setup-label">Firebase API Key</div>
+    <input type="text" id="firebaseApiKey" placeholder="AIzaSy...">
     <div class="setup-label">Kód místnosti (vymysli si)</div>
-    <input type="text" id="adminRoomCode" placeholder="Např. SERPA25" maxlength="10" style="text-transform:uppercase;letter-spacing:0.1em;">
+    <input type="text" id="adminRoomCode" placeholder="Např. SERPA24" maxlength="10" style="text-transform:uppercase;letter-spacing:0.1em;">
     <button class="btn btn-primary" onclick="adminLogin()">Přihlásit →</button>
   </div>
 
@@ -451,18 +455,6 @@
 
 <script>
 // ═══════════════════════════════════════════
-//  FIREBASE CONFIG — sem dej svoje hodnoty
-// ═══════════════════════════════════════════
-const FB_API_KEY = 'AIzaSyBNFR5JA3frGuPpbS0H6IlOWfBOqIkVyx0';
-const FB_DB_URL  = 'https://serpovanigit-default-rtdb.europe-west1.firebasedatabase.app';
-
-// ═══════════════════════════════════════════
-//  FIREBASE CONFIG — napevno v kódu
-// ═══════════════════════════════════════════
-const FB_API_KEY = 'AIzaSyBNFR5JA3frGuPpbS0H6IlOWfBOqIkVyx0';
-const FB_DB_URL  = 'https://serpovanigit-default-rtdb.europe-west1.firebasedatabase.app';
-
-// ═══════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════
 const OPT_COLORS = ['#f0e040','#ff5e5e','#5ef0b8','#5eaaff','#ff9f40','#c65eff','#ff5ea8','#5effd6'];
@@ -508,9 +500,16 @@ async function playerJoin() {
   const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
   if (!playerName || !code) return alert('Vyplň jméno a kód místnosti!');
 
+  // Need firebase – try to detect config from room
+  // Player needs firebase URL & key. Simplest: store it in room on Firebase or ask user.
+  // For simplicity: player must also know the Firebase URL.
+  // We'll embed a prompt for it if db not yet set.
   if (!db) {
-    initFirebase(FB_API_KEY, FB_DB_URL);
-    await new Promise(r => setTimeout(r, 800));
+    const fbUrl = prompt('Zadej Firebase Database URL (dostaneš od admina):');
+    const fbKey = prompt('Zadej Firebase API Key:');
+    if (!fbUrl || !fbKey) return;
+    initFirebase(fbKey.trim(), fbUrl.trim());
+    await new Promise(r => setTimeout(r, 600));
   }
 
   roomCode = code;
@@ -556,13 +555,10 @@ async function playerJoin() {
   });
 }
 
-async function renderPlayerVote(poll) {
-  // Zkontroluj jestli uz hlasoval (ochrana po refreshi)
-  const safeKey = playerName.replace(/[.#$\/\[\]]/g, '_');
-  const alreadySnap = await roomRef.child('poll/voters/' + safeKey).once('value');
-  hasVoted = alreadySnap.exists();
-
+function renderPlayerVote(poll) {
+  hasVoted = false;
   document.getElementById('playerQuestion').textContent = poll.question;
+  document.getElementById('votedMsg').classList.add('hidden');
   const el = document.getElementById('playerOptions');
   el.innerHTML = '';
   poll.options.forEach((opt, i) => {
@@ -571,34 +567,16 @@ async function renderPlayerVote(poll) {
     btn.style.background = OPT_COLORS[i % OPT_COLORS.length];
     btn.style.color = '#000';
     btn.textContent = opt;
-    if (hasVoted) btn.disabled = true;
-    btn.onclick = () => castVote(i);
+    btn.onclick = () => castVote(i, poll.options.length);
     el.appendChild(btn);
   });
-
-  if (hasVoted) {
-    document.getElementById('votedMsg').classList.remove('hidden');
-  } else {
-    document.getElementById('votedMsg').classList.add('hidden');
-  }
 }
 
-async function castVote(optionIndex) {
+async function castVote(optionIndex, totalOptions) {
   if (hasVoted) return;
-  const safeKey = playerName.replace(/[.#$\/\[\]]/g, '_');
-  // Check if already voted in Firebase (ochrana proti obnovení stránky)
-  const alreadySnap = await roomRef.child('poll/voters/' + safeKey).once('value');
-  if (alreadySnap.exists()) {
-    hasVoted = true;
-    document.querySelectorAll('.vote-option').forEach(b => b.disabled = true);
-    document.getElementById('votedMsg').classList.remove('hidden');
-    return;
-  }
   hasVoted = true;
   document.querySelectorAll('.vote-option').forEach(b => b.disabled = true);
   document.getElementById('votedMsg').classList.remove('hidden');
-  // Atomicky zapiš hlas a označ hráče jako hlasovavšího
-  await roomRef.child('poll/voters/' + safeKey).set(optionIndex);
   await roomRef.child('poll/votes/' + optionIndex).transaction(v => (v || 0) + 1);
 }
 
@@ -611,10 +589,12 @@ function renderPlayerResults(poll) {
 // ═══════════════════════════════════════════
 function adminLogin() {
   adminPassword = document.getElementById('adminPassword').value;
+  const fbUrl = document.getElementById('firebaseUrl').value.trim();
+  const fbKey = document.getElementById('firebaseApiKey').value.trim();
   roomCode = document.getElementById('adminRoomCode').value.trim().toUpperCase();
-  if (!adminPassword || !roomCode) return alert('Vyplň heslo a kód místnosti!');
+  if (!adminPassword || !fbUrl || !fbKey || !roomCode) return alert('Vyplň vše!');
 
-  initFirebase(FB_API_KEY, FB_DB_URL);
+  initFirebase(fbKey, fbUrl);
   setTimeout(() => {
     roomRef = db.ref('rooms/' + roomCode);
     // Init room
@@ -666,7 +646,7 @@ async function launchPoll() {
   const votes = {};
   options.forEach((_, i) => votes[i] = 0);
 
-  await roomRef.child('poll').set({ question, options, votes, voters: {}, status: 'active', started: Date.now() });
+  await roomRef.child('poll').set({ question, options, votes, status: 'active', started: Date.now() });
   show('adminResultsCard', true);
 }
 
