@@ -402,53 +402,72 @@
   </div>
 
   <!-- ADMIN DASHBOARD -->
-  <div class="hidden" id="adminDash">
+<div class="hidden" id="adminDash">
 
-    <!-- Room info -->
-    <div class="card fade-up">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
-        <div>
-          <div class="setup-label">Kód místnosti (sdílej spolužákům)</div>
-          <div class="code-display" id="adminRoomDisplay"></div>
-        </div>
-        <div style="text-align:right;">
-          <div class="setup-label">Připojeno</div>
-          <div style="font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;color:var(--accent3);" id="adminParticipantCount">0</div>
-        </div>
+  <!-- Room info -->
+  <div class="card fade-up">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+      <div>
+        <div class="setup-label">Kód místnosti (sdílej spolužákům)</div>
+        <div class="code-display" id="adminRoomDisplay"></div>
       </div>
-      <div class="participants-grid" id="adminParticipantsList"></div>
-    </div>
-
-    <!-- Create question -->
-    <div class="card fade-up">
-      <div class="section-title">Nová otázka</div>
-      <div class="setup-label">Otázka</div>
-      <input type="text" id="questionInput" placeholder="Kdo bude šerpou letošního roku?">
-      <div class="setup-label">Možnosti odpovědí</div>
-      <div class="options-list" id="optionsList">
-        <div class="option-row"><input type="text" placeholder="Možnost 1"><button onclick="removeOption(this)">✕</button></div>
-        <div class="option-row"><input type="text" placeholder="Možnost 2"><button onclick="removeOption(this)">✕</button></div>
-      </div>
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-        <button class="btn btn-ghost" onclick="addOption()">+ Přidat možnost</button>
-        <button class="btn btn-primary" onclick="launchPoll()">▶ Spustit hlasování</button>
-        <button onclick="resetRoom()" class="danger-btn">Reset místnosti</button>
+      <div style="text-align:right;">
+        <div class="setup-label">Připojeno</div>
+        <div style="font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;color:var(--accent3);" id="adminParticipantCount">0</div>
       </div>
     </div>
-
-    <!-- Results -->
-    <div class="card fade-up hidden" id="adminResultsCard">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
-        <div class="section-title" style="margin:0">📊 Live výsledky</div>
-        <div class="status"><div class="status-dot"></div><span id="voteCountLabel">0 hlasů</span></div>
-      </div>
-      <div id="adminResultBars"></div>
-      <div class="divider"></div>
-      <button class="btn btn-danger" onclick="endPoll()">■ Ukončit hlasování</button>
-    </div>
-
+    <div class="participants-grid" id="adminParticipantsList"></div>
   </div>
+
+  <!-- PRESET OTÁZKY -->
+  <div class="card fade-up">
+    <h3>Předpřipravené otázky</h3>
+
+    <div id="presetCreator">
+      <input id="presetQuestion" type="text" placeholder="Zadej otázku">
+
+      <div id="presetOptions"></div>
+      <button type="button" onclick="addPresetOption()">Přidat možnost</button>
+
+      <button type="button" onclick="savePreset()">Uložit otázku</button>
+    </div>
+
+    <hr>
+
+    <select id="presetSelect"></select>
+    <button type="button" onclick="launchSelectedPreset()">Spustit vybranou</button>
+  </div>
+
+  <!-- Create question -->
+  <div class="card fade-up">
+    <div class="section-title">Nová otázka</div>
+    <div class="setup-label">Otázka</div>
+    <input type="text" id="questionInput" placeholder="Kdo bude šerpou letošního roku?">
+    <div class="setup-label">Možnosti odpovědí</div>
+    <div class="options-list" id="optionsList">
+      <div class="option-row"><input type="text" placeholder="Možnost 1"><button onclick="removeOption(this)">✕</button></div>
+      <div class="option-row"><input type="text" placeholder="Možnost 2"><button onclick="removeOption(this)">✕</button></div>
+    </div>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <button class="btn btn-ghost" onclick="addOption()">+ Přidat možnost</button>
+      <button class="btn btn-primary" onclick="launchPoll()">▶ Spustit hlasování</button>
+      <button onclick="resetRoom()" class="danger-btn">Reset místnosti</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="card fade-up hidden" id="adminResultsCard">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+      <div class="section-title" style="margin:0">📊 Live výsledky</div>
+      <div class="status"><div class="status-dot"></div><span id="voteCountLabel">0 hlasů</span></div>
+    </div>
+    <div id="adminResultBars"></div>
+    <div class="divider"></div>
+    <button class="btn btn-danger" onclick="endPoll()">■ Ukončit hlasování</button>
+  </div>
+
 </div>
+
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -741,7 +760,111 @@ roomRef.child('participants').on('value', snap => {
       return;
     }
   });
+  
+  loadPresetsIntoDropdown();
 }
+
+// ═══════════════════════════════════════════
+//  PRESET OTÁZKY – ADMIN
+// ═══════════════════════════════════════════
+
+function addPresetOption() {
+  const div = document.createElement('div');
+  div.className = 'option-row';
+  div.innerHTML = `
+    <input type="text" placeholder="Možnost">
+    <button type="button" onclick="this.parentElement.remove()">✕</button>
+  `;
+  document.getElementById('presetOptions').appendChild(div);
+}
+
+async function savePreset() {
+  if (!roomRef) {
+    alert("Místnost není načtena.");
+    return;
+  }
+
+  const question = document.getElementById('presetQuestion').value.trim();
+  const inputs = [...document.querySelectorAll('#presetOptions input')];
+  const options = inputs.map(i => i.value.trim()).filter(Boolean);
+
+  if (!question || options.length < 2) {
+    alert("Zadej otázku a aspoň 2 možnosti.");
+    return;
+  }
+
+  const presetRef = roomRef.child('presetPolls');
+  const snap = await presetRef.once('value');
+  const presets = snap.val() || [];
+
+  presets.push({ question, options });
+
+  await presetRef.set(presets);
+
+  alert("Otázka uložena.");
+
+  document.getElementById('presetQuestion').value = '';
+  document.getElementById('presetOptions').innerHTML = '';
+
+  loadPresetsIntoDropdown();
+}
+
+async function loadPresetsIntoDropdown() {
+  if (!roomRef) return;
+
+  const snap = await roomRef.child('presetPolls').once('value');
+  const presets = snap.val() || [];
+
+  const sel = document.getElementById('presetSelect');
+  if (!sel) return;
+
+  sel.innerHTML = '';
+
+  presets.forEach((p, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = p.question;
+    sel.appendChild(opt);
+  });
+}
+
+async function launchSelectedPreset() {
+  if (!roomRef) {
+    alert("Místnost není načtena.");
+    return;
+  }
+
+  const sel = document.getElementById('presetSelect');
+  if (!sel || sel.value === '') {
+    alert("Vyber otázku.");
+    return;
+  }
+
+  const index = sel.value;
+
+  const snap = await roomRef.child('presetPolls/' + index).once('value');
+  const poll = snap.val();
+
+  if (!poll) {
+    alert("Otázka nenalezena.");
+    return;
+  }
+
+  const votes = {};
+  poll.options.forEach((_, i) => votes[i] = 0);
+
+  await roomRef.child('poll').set({
+    question: poll.question,
+    options: poll.options,
+    votes,
+    voters: {},
+    status: 'active',
+    started: Date.now()
+  });
+
+  show('adminResultsCard', true);
+}
+
 
 // ═══════════════════════════════════════════
 //  RESET MÍSTNOSTI
