@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>Live Leaderboard</title>
+
+<style>
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #f5f5f5;
+    padding: 20px;
+    max-width: 700px;
+    margin: auto;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    margin-bottom: 1.5rem;
+    font-weight: 700;
+  }
+
+  .question {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+  }
+
+  .result-row {
+    margin-bottom: 1.2rem;
+  }
+
+  .label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.95rem;
+    margin-bottom: 6px;
+  }
+
+  .bar-bg {
+    width: 100%;
+    height: 22px;
+    background: #e5e5e5;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.25s ease;
+  }
+</style>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+</head>
+<body>
+
+<h1>📊 Live výsledky</h1>
+<div id="question" class="question"></div>
+<div id="results"></div>
+
+<script>
+const OPT_COLORS = [
+  "#f0e040", "#ff5e5e", "#5ef0b8", "#5eaaff",
+  "#ff9f40", "#c65eff", "#ff5ea8", "#5effd6"
+];
+
+function getRoomCode() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("room")?.toUpperCase() || "";
+}
+
+async function init() {
+  const roomCode = getRoomCode();
+  if (!roomCode) {
+    document.body.innerHTML = "<h2>Chybí ?room=KOD v URL</h2>";
+    return;
+  }
+
+  // 1) Dočasná appka pro načtení configu
+  const tempApp = firebase.initializeApp(
+    { databaseURL: "https://serpovanigit-default-rtdb.europe-west1.firebasedatabase.app" },
+    "temp"
+  );
+  const tempDb = tempApp.database();
+
+  const metaSnap = await tempDb.ref("rooms/" + roomCode + "/meta/firebaseConfig").once("value");
+  const cfg = metaSnap.val();
+
+  await tempApp.delete();
+
+  if (!cfg) {
+    document.body.innerHTML = "<h2>Místnost nemá uložený Firebase config.</h2>";
+    return;
+  }
+
+  // 2) Skutečná appka
+  firebase.initializeApp(cfg);
+  const db = firebase.database();
+  const roomRef = db.ref("rooms/" + roomCode);
+
+  // 3) Listener na poll
+  roomRef.child("poll").on("value", snap => {
+    const poll = snap.val();
+    if (!poll) {
+      document.getElementById("question").textContent = "Čeká se na otázku…";
+      document.getElementById("results").innerHTML = "";
+      return;
+    }
+
+    renderLeaderboard(poll);
+  });
+}
+
+function renderLeaderboard(poll) {
+  document.getElementById("question").textContent = poll.question;
+
+  const votes = poll.votes || {};
+  const total = Object.values(votes).reduce((a,b)=>a+b,0);
+
+  const container = document.getElementById("results");
+  container.innerHTML = "";
+
+  poll.options.forEach((opt, i) => {
+    const count = votes[i] || 0;
+    const pct = total > 0 ? Math.round((count/total)*100) : 0;
+
+    container.innerHTML += `
+      <div class="result-row">
+        <div class="label">
+          <span>${opt}</span>
+          <span>${count} hlasy · ${pct}%</span>
+        </div>
+        <div class="bar-bg">
+          <div class="bar-fill" style="width:${pct}%; background:${OPT_COLORS[i % OPT_COLORS.length]}"></div>
+        </div>
+      </div>
+    `;
+  });
+}
+
+init();
+</script>
+
+</body>
+</html>
