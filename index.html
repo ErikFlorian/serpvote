@@ -659,8 +659,7 @@ function renderPlayerResults(poll) {
 // ═══════════════════════════════════════════
 //  ADMIN FLOW — FINÁLNÍ OPRAVENÁ VERZE
 // ═══════════════════════════════════════════
-
-function renderParticipants(containerId, partsObj) {
+function renderAdminParticipants(containerId, partsObj) {
   const el = document.getElementById(containerId);
   if (!el) return;
 
@@ -679,6 +678,7 @@ function kickPlayer(id) {
   if (!roomRef) return;
   roomRef.child('participants/' + id).remove();
 }
+
 
 function adminLogin() {
   adminPassword = document.getElementById('adminPassword').value;
@@ -715,11 +715,11 @@ function adminLogin() {
   document.getElementById('adminRoomDisplay').textContent = roomCode;
 
   // 4) Listener na hráče
-  roomRef.child('participants').on('value', snap => {
-    const parts = snap.val() || {};
-    document.getElementById('adminParticipantCount').textContent = Object.keys(parts).length;
-    renderParticipants('adminParticipantsList', parts);
-  });
+roomRef.child('participants').on('value', snap => {
+  const parts = snap.val() || {};
+  document.getElementById('adminParticipantCount').textContent = Object.keys(parts).length;
+  renderAdminParticipants('adminParticipantsList', parts);
+});
 
   // 5) Listener na poll
   roomRef.child('poll').on('value', snap => {
@@ -730,11 +730,19 @@ function adminLogin() {
       return;
     }
 
-    show('adminResultsCard', true);
-    renderAdminResults(poll);
+    if (poll.status === 'active') {
+      show('adminResultsCard', true);
+      renderAdminResults(poll);
+      return;
+    }
+
+    if (poll.status === 'ended') {
+      show('adminResultsCard', true);
+      renderAdminResults(poll);
+      return;
+    }
   });
 }
-
 
 // ═══════════════════════════════════════════
 //  RESET MÍSTNOSTI
@@ -877,7 +885,7 @@ function renderResultBars(containerId, poll) {
   });
 }
 
-function renderParticipants(containerId, names) {
+function renderPlayerParticipants(containerId, names) {
   const el = document.getElementById(containerId);
   if (!el) return;
 
@@ -890,6 +898,7 @@ function renderParticipants(containerId, names) {
     `)
     .join('');
 }
+
 
 function show(id, visible) {
   document.getElementById(id).classList.toggle('hidden', !visible);
