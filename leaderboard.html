@@ -188,6 +188,20 @@
     0%, 100% { transform: translateY(0); }
     50%      { transform: translateY(-10px); }
   }
+
+  /* WATERMARK */
+  .watermark {
+    position: fixed;
+    bottom: 12px;
+    right: 18px;
+    font-size: 0.9rem;
+    opacity: 0.25;
+    letter-spacing: 1px;
+    color: white;
+    pointer-events: none;
+    user-select: none;
+    text-shadow: 0 0 8px rgba(255,255,255,0.3);
+  }
 </style>
 
 <!-- Firebase -->
@@ -200,6 +214,11 @@
 <h1>📊 Live výsledky</h1>
 <div id="question" class="question"></div>
 <div id="results"></div>
+
+<!-- WINNER CONTAINER (NEPŘEPISUJE SE BODY!) -->
+<div id="winner"></div>
+
+<div class="watermark">Made by Kxnvra</div>
 
 <script>
 const OPT_COLORS = [
@@ -306,11 +325,14 @@ function showWinner(poll) {
   spawnConfetti();
   setInterval(spawnConfetti, 2500);
 
+  const winnerBox = document.getElementById("winner");
+
+  // REMÍZA
   if (winners.length > 1) {
-    document.body.innerHTML = `
+    winnerBox.innerHTML = `
       <div class="winner-anim">
         <div class="crown">👑</div>
-        <div class="winner-name" style="font-size:2.6rem; opacity:0.9;">
+        <div class="winner-name" style="font-size:2.6rem;">
           REMÍZA 🎉
         </div>
         <div class="winner-emojis" style="font-size:2rem; margin-top:10px;">✨🏆✨</div>
@@ -323,9 +345,10 @@ function showWinner(poll) {
     return;
   }
 
+  // JEDEN VÍTĚZ
   const winner = winners[0];
 
-  document.body.innerHTML = `
+  winnerBox.innerHTML = `
     <div class="winner-anim">
       <div class="crown">👑</div>
       <div class="winner-name">${winner}</div>
