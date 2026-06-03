@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Šerpovačka – Hlasování</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0f;
+    --surface: #18181c;
+    --surface2: #222228;
+    --border: rgba(255,255,255,0.08);
+    --accent: #f0e040;
+    --accent2: #ff5e5e;
+    --accent3: #5ef0b8;
+    --accent4: #5eaaff;
+    --text: #f0efe8;
+    --muted: #7a7a8a;
+    --radius: 14px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    width: 100%;
+    max-width: 700px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2.5rem;
+  }
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--accent);
+  }
+  .logo span { color: var(--text); }
+  .badge {
+    font-size: 0.72rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    width: 100%;
+    max-width: 700px;
+    margin-bottom: 1rem;
+  }
+
+  /* ── SETUP SCREEN ── */
+  .setup-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+  input[type="text"], input[type="password"], textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+    margin-bottom: 1rem;
+  }
+  input:focus, textarea:focus {
+    border-color: var(--accent);
+  }
+  textarea { resize: vertical; min-height: 60px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+  }
+  .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-ghost:hover { border-color: rgba(255,255,255,0.25); }
+  .btn-danger {
+    background: var(--accent2);
+    color: #fff;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* ── OPTION INPUTS ── */
+  .options-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+  .option-row { display: flex; gap: 0.5rem; }
+  .option-row input { margin-bottom: 0; flex: 1; }
+  .option-row button {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0 0.75rem;
+    font-size: 1.1rem;
+    transition: all 0.15s;
+  }
+  .option-row button:hover { color: var(--accent2); border-color: var(--accent2); }
+
+  /* ── WAITING ROOM ── */
+  .participants-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  .participant-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .participant-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent3);
+  }
+
+  /* ── VOTE SCREEN ── */
+  .question-text {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.02em;
+  }
+  .vote-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  @media (max-width: 480px) { .vote-options { grid-template-columns: 1fr; } }
+  
+  .vote-option {
+    border-radius: var(--radius);
+    padding: 1.2rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.18s;
+    text-align: left;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .vote-option:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.1); }
+  .vote-option:disabled { cursor: not-allowed; }
+  .vote-option.selected { border-color: rgba(255,255,255,0.6) !important; }
+
+  .opt-colors: [
+    '#f0e040', '#ff5e5e', '#5ef0b8', '#5eaaff',
+    '#ff9f40', '#c65eff', '#ff5ea8', '#5effd6'
+  ];
+
+  /* ── RESULTS ── */
+  .result-bar-wrap {
+    margin-bottom: 1rem;
+  }
+  .result-label-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+  }
+  .result-label-row span:first-child { font-weight: 500; }
+  .result-label-row span:last-child { color: var(--muted); }
+  .bar-bg {
+    height: 10px;
+    background: var(--surface2);
+    border-radius: 100px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 100px;
+    transition: width 0.6s cubic-bezier(0.34, 1.1, 0.64, 1);
+  }
+
+  /* ── LOBBY CODE ── */
+  .code-display {
+    font-family: 'Syne', sans-serif;
+    font-size: 3rem;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    text-align: center;
+    padding: 1rem 0;
+  }
+
+  /* ── STATUS BAR ── */
+  .status {
+    font-size: 0.8rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent3);
+    animation: pulse 2s infinite;
+  }
+
+  /* ── SECTION TITLE ── */
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    letter-spacing: -0.01em;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 1.25rem 0;
+  }
+
+  /* ── TABS (admin/player) ── */
+  .role-select {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    width: 100%;
+    max-width: 700px;
+  }
+  .role-btn {
+    flex: 1;
+    padding: 0.65rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .role-btn.active {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+    font-weight: 500;
+  }
+
+  .hidden { display: none !important; }
+
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.8); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .fade-up { animation: fadeUp 0.35s ease both; }
+
+  .info-box {
+    background: rgba(240,224,64,0.07);
+    border: 1px solid rgba(240,224,64,0.2);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    color: #c8c060;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+  .voted-msg {
+    text-align: center;
+    padding: 2rem;
+    color: var(--accent3);
+    font-family: 'Syne', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">šerp<span>vote</span></div>
+  <div class="badge" id="connectionBadge">offline</div>
+</div>
+
+<!-- ROLE SELECT -->
+<div class="role-select" id="roleSelect">
+  <button class="role-btn active" onclick="setRole('player')" id="btnPlayer">🙋 Hlasující</button>
+  <button class="role-btn" onclick="setRole('admin')" id="btnAdmin">🎛️ Admin</button>
+</div>
+
+<!-- ══════════════ PLAYER FLOW ══════════════ -->
+<div id="playerFlow" style="width:100%;max-width:700px;">
+
+  <!-- JOIN SCREEN -->
+  <div class="card fade-up" id="playerJoin">
+    <div class="section-title">Připoj se k hlasování</div>
+    <div class="setup-label">Tvoje jméno</div>
+    <input type="text" id="playerName" placeholder="Např. Tomáš" maxlength="30">
+    <div class="setup-label">Kód místnosti</div>
+    <input type="text" id="roomCodeInput" placeholder="Např. ABC123" maxlength="10" style="text-transform:uppercase;letter-spacing:0.1em;">
+    <button class="btn btn-primary" onclick="playerJoin()">Vstoupit →</button>
+  </div>
+
+  <!-- WAITING SCREEN -->
+  <div class="card fade-up hidden" id="playerWaiting">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <div class="section-title" style="margin:0">Čekárna</div>
+      <div class="status"><div class="status-dot"></div><span id="waitStatus">čekám na otázku…</span></div>
+    </div>
+    <div style="font-size:0.85rem;color:var(--muted);margin-bottom:0.75rem;">Připojení v místnosti:</div>
+    <div class="participants-grid" id="playerParticipantsList"></div>
+  </div>
+
+  <!-- VOTING SCREEN -->
+  <div class="card fade-up hidden" id="playerVote">
+    <div class="question-text" id="playerQuestion"></div>
+    <div class="vote-options" id="playerOptions"></div>
+    <div class="voted-msg hidden" id="votedMsg">✓ Hlasováno! Čekám na výsledky…</div>
+  </div>
+
+  <!-- RESULTS SCREEN (player) -->
+  <div class="card fade-up hidden" id="playerResults">
+    <div class="section-title">📊 Výsledky</div>
+    <div id="playerResultBars"></div>
+  </div>
+
+</div>
+
+<!-- ══════════════ ADMIN FLOW ══════════════ -->
+<div id="adminFlow" class="hidden" style="width:100%;max-width:700px;">
+
+  <!-- ADMIN LOGIN -->
+  <div class="card fade-up" id="adminLogin">
+    <div class="section-title">Admin přihlášení</div>
+    <div class="info-box">Zadej heslo a Firebase config pro správu ankety.</div>
+    <div class="setup-label">Admin heslo</div>
+    <input type="password" id="adminPassword" placeholder="Tvoje heslo">
+    <div class="setup-label">Firebase Database URL</div>
+    <input type="text" id="firebaseUrl" placeholder="https://xxx-default-rtdb.europe-west1.firebasedatabase.app">
+    <div class="setup-label">Firebase API Key</div>
+    <input type="text" id="firebaseApiKey" placeholder="AIzaSy...">
+    <div class="setup-label">Kód místnosti (vymysli si)</div>
+    <input type="text" id="adminRoomCode" placeholder="Např. SERPA24" maxlength="10" style="text-transform:uppercase;letter-spacing:0.1em;">
+    <button class="btn btn-primary" onclick="adminLogin()">Přihlásit →</button>
+  </div>
+
+  <!-- ADMIN DASHBOARD -->
+  <div class="hidden" id="adminDash">
+
+    <!-- Room info -->
+    <div class="card fade-up">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+        <div>
+          <div class="setup-label">Kód místnosti (sdílej spolužákům)</div>
+          <div class="code-display" id="adminRoomDisplay"></div>
+        </div>
+        <div style="text-align:right;">
+          <div class="setup-label">Připojeno</div>
+          <div style="font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;color:var(--accent3);" id="adminParticipantCount">0</div>
+        </div>
+      </div>
+      <div class="participants-grid" id="adminParticipantsList"></div>
+    </div>
+
+    <!-- Create question -->
+    <div class="card fade-up">
+      <div class="section-title">Nová otázka</div>
+      <div class="setup-label">Otázka</div>
+      <input type="text" id="questionInput" placeholder="Kdo bude šerpou letošního roku?">
+      <div class="setup-label">Možnosti odpovědí</div>
+      <div class="options-list" id="optionsList">
+        <div class="option-row"><input type="text" placeholder="Možnost 1"><button onclick="removeOption(this)">✕</button></div>
+        <div class="option-row"><input type="text" placeholder="Možnost 2"><button onclick="removeOption(this)">✕</button></div>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button class="btn btn-ghost" onclick="addOption()">+ Přidat možnost</button>
+        <button class="btn btn-primary" onclick="launchPoll()">▶ Spustit hlasování</button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card fade-up hidden" id="adminResultsCard">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+        <div class="section-title" style="margin:0">📊 Live výsledky</div>
+        <div class="status"><div class="status-dot"></div><span id="voteCountLabel">0 hlasů</span></div>
+      </div>
+      <div id="adminResultBars"></div>
+      <div class="divider"></div>
+      <button class="btn btn-danger" onclick="endPoll()">■ Ukončit hlasování</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+const OPT_COLORS = ['#f0e040','#ff5e5e','#5ef0b8','#5eaaff','#ff9f40','#c65eff','#ff5ea8','#5effd6'];
+let role = 'player';
+let db = null;
+let roomRef = null;
+let roomCode = '';
+let playerName = '';
+let hasVoted = false;
+let adminPassword = '';
+
+// ─── ROLE SWITCH ───
+function setRole(r) {
+  role = r;
+  document.getElementById('btnPlayer').classList.toggle('active', r === 'player');
+  document.getElementById('btnAdmin').classList.toggle('active', r === 'admin');
+  document.getElementById('playerFlow').classList.toggle('hidden', r !== 'player');
+  document.getElementById('adminFlow').classList.toggle('hidden', r !== 'admin');
+}
+
+// ═══════════════════════════════════════════
+//  FIREBASE INIT
+// ═══════════════════════════════════════════
+function initFirebase(apiKey, dbUrl) {
+  if (firebase.apps.length) {
+    firebase.app().delete().then(() => _initFB(apiKey, dbUrl));
+  } else {
+    _initFB(apiKey, dbUrl);
+  }
+}
+function _initFB(apiKey, dbUrl) {
+  firebase.initializeApp({ apiKey, databaseURL: dbUrl });
+  db = firebase.database();
+  document.getElementById('connectionBadge').textContent = 'live';
+  document.getElementById('connectionBadge').style.color = '#5ef0b8';
+}
+
+// ═══════════════════════════════════════════
+//  PLAYER FLOW
+// ═══════════════════════════════════════════
+async function playerJoin() {
+  playerName = document.getElementById('playerName').value.trim();
+  const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+  if (!playerName || !code) return alert('Vyplň jméno a kód místnosti!');
+
+  // Need firebase – try to detect config from room
+  // Player needs firebase URL & key. Simplest: store it in room on Firebase or ask user.
+  // For simplicity: player must also know the Firebase URL.
+  // We'll embed a prompt for it if db not yet set.
+  if (!db) {
+    const fbUrl = prompt('Zadej Firebase Database URL (dostaneš od admina):');
+    const fbKey = prompt('Zadej Firebase API Key:');
+    if (!fbUrl || !fbKey) return;
+    initFirebase(fbKey.trim(), fbUrl.trim());
+    await new Promise(r => setTimeout(r, 600));
+  }
+
+  roomCode = code;
+  roomRef = db.ref('rooms/' + roomCode);
+
+  // Check room exists
+  const snap = await roomRef.once('value');
+  if (!snap.exists()) return alert('Místnost nenalezena. Zkontroluj kód.');
+
+  // Register participant
+  const safeKey = playerName.replace(/[.#$/\[\]]/g, '_');
+  await roomRef.child('participants/' + safeKey).set({ name: playerName, joined: Date.now() });
+
+  show('playerJoin', false);
+  show('playerWaiting', true);
+
+  // Listen for poll state
+  roomRef.child('poll').on('value', snap => {
+    const poll = snap.val();
+    if (!poll) {
+      show('playerVote', false);
+      show('playerResults', false);
+      show('playerWaiting', true);
+      return;
+    }
+    if (poll.status === 'active') {
+      show('playerWaiting', false);
+      show('playerResults', false);
+      show('playerVote', true);
+      renderPlayerVote(poll);
+    } else if (poll.status === 'ended') {
+      show('playerVote', false);
+      show('playerWaiting', false);
+      show('playerResults', true);
+      renderPlayerResults(poll);
+    }
+  });
+
+  // Listen for participants
+  roomRef.child('participants').on('value', snap => {
+    const parts = snap.val() || {};
+    renderParticipants('playerParticipantsList', Object.values(parts).map(p => p.name));
+  });
+}
+
+function renderPlayerVote(poll) {
+  hasVoted = false;
+  document.getElementById('playerQuestion').textContent = poll.question;
+  document.getElementById('votedMsg').classList.add('hidden');
+  const el = document.getElementById('playerOptions');
+  el.innerHTML = '';
+  poll.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'vote-option';
+    btn.style.background = OPT_COLORS[i % OPT_COLORS.length];
+    btn.style.color = '#000';
+    btn.textContent = opt;
+    btn.onclick = () => castVote(i, poll.options.length);
+    el.appendChild(btn);
+  });
+}
+
+async function castVote(optionIndex, totalOptions) {
+  if (hasVoted) return;
+  hasVoted = true;
+  document.querySelectorAll('.vote-option').forEach(b => b.disabled = true);
+  document.getElementById('votedMsg').classList.remove('hidden');
+  await roomRef.child('poll/votes/' + optionIndex).transaction(v => (v || 0) + 1);
+}
+
+function renderPlayerResults(poll) {
+  renderResultBars('playerResultBars', poll);
+}
+
+// ═══════════════════════════════════════════
+//  ADMIN FLOW
+// ═══════════════════════════════════════════
+function adminLogin() {
+  adminPassword = document.getElementById('adminPassword').value;
+  const fbUrl = document.getElementById('firebaseUrl').value.trim();
+  const fbKey = document.getElementById('firebaseApiKey').value.trim();
+  roomCode = document.getElementById('adminRoomCode').value.trim().toUpperCase();
+  if (!adminPassword || !fbUrl || !fbKey || !roomCode) return alert('Vyplň vše!');
+
+  initFirebase(fbKey, fbUrl);
+  setTimeout(() => {
+    roomRef = db.ref('rooms/' + roomCode);
+    // Init room
+    roomRef.child('meta').set({ code: roomCode, created: Date.now() });
+
+    show('adminLogin', false);
+    show('adminDash', true);
+    document.getElementById('adminRoomDisplay').textContent = roomCode;
+
+    // Listen participants
+    roomRef.child('participants').on('value', snap => {
+      const parts = snap.val() || {};
+      const names = Object.values(parts).map(p => p.name);
+      document.getElementById('adminParticipantCount').textContent = names.length;
+      renderParticipants('adminParticipantsList', names);
+    });
+
+    // Listen poll state
+    roomRef.child('poll').on('value', snap => {
+      const poll = snap.val();
+      if (poll && poll.status === 'active') {
+        show('adminResultsCard', true);
+        renderAdminResults(poll);
+      }
+    });
+  }, 800);
+}
+
+function addOption() {
+  const list = document.getElementById('optionsList');
+  const div = document.createElement('div');
+  div.className = 'option-row';
+  const idx = list.children.length + 1;
+  div.innerHTML = `<input type="text" placeholder="Možnost ${idx}"><button onclick="removeOption(this)">✕</button>`;
+  list.appendChild(div);
+}
+function removeOption(btn) {
+  const list = document.getElementById('optionsList');
+  if (list.children.length <= 2) return;
+  btn.closest('.option-row').remove();
+}
+
+async function launchPoll() {
+  const question = document.getElementById('questionInput').value.trim();
+  const inputs = document.querySelectorAll('#optionsList .option-row input');
+  const options = [...inputs].map(i => i.value.trim()).filter(Boolean);
+  if (!question || options.length < 2) return alert('Zadej otázku a aspoň 2 možnosti!');
+
+  const votes = {};
+  options.forEach((_, i) => votes[i] = 0);
+
+  await roomRef.child('poll').set({ question, options, votes, status: 'active', started: Date.now() });
+  show('adminResultsCard', true);
+}
+
+async function endPoll() {
+  await roomRef.child('poll/status').set('ended');
+  show('adminResultsCard', false);
+}
+
+function renderAdminResults(poll) {
+  const votes = poll.votes || {};
+  const total = Object.values(votes).reduce((a, b) => a + b, 0);
+  document.getElementById('voteCountLabel').textContent = total + ' hlas' + (total === 1 ? '' : total < 5 ? 'y' : 'ů');
+  renderResultBars('adminResultBars', poll);
+}
+
+// ═══════════════════════════════════════════
+//  SHARED HELPERS
+// ═══════════════════════════════════════════
+function renderResultBars(containerId, poll) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const votes = poll.votes || {};
+  const total = Object.values(votes).reduce((a, b) => a + b, 0);
+  el.innerHTML = '';
+  (poll.options || []).forEach((opt, i) => {
+    const count = votes[i] || 0;
+    const pct = total > 0 ? Math.round(count / total * 100) : 0;
+    el.innerHTML += `
+      <div class="result-bar-wrap">
+        <div class="result-label-row">
+          <span>${opt}</span>
+          <span>${count} hlas${count===1?'':count<5?'y':'ů'} · ${pct}%</span>
+        </div>
+        <div class="bar-bg">
+          <div class="bar-fill" style="width:${pct}%;background:${OPT_COLORS[i%OPT_COLORS.length]}"></div>
+        </div>
+      </div>`;
+  });
+}
+
+function renderParticipants(containerId, names) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = names.map(n =>
+    `<div class="participant-chip"><div class="participant-dot"></div>${escHtml(n)}</div>`
+  ).join('');
+}
+
+function show(id, visible) {
+  document.getElementById(id).classList.toggle('hidden', !visible);
+}
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
