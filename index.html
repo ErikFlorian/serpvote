@@ -596,7 +596,7 @@ async function playerJoin() {
       return;
     }
   });
-
+}
 // 10) Listener na hráče (s detekcí kicku)
 roomRef.child('participants').on('value', snap => {
   const parts = snap.val() || {};
