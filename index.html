@@ -432,6 +432,7 @@
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
         <button class="btn btn-ghost" onclick="addOption()">+ Přidat možnost</button>
         <button class="btn btn-primary" onclick="launchPoll()">▶ Spustit hlasování</button>
+        <button onclick="resetRoom()" class="danger-btn">Reset místnosti</button>
       </div>
     </div>
 
@@ -454,10 +455,22 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBNFR5JA3frGuPpbS0H6IlOWfBOqIkVyx0",
+  authDomain: "serpovanigit.firebaseapp.com",
+  databaseURL: "https://serpovanigit-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "serpovanigit",
+  storageBucket: "serpovanigit.firebasestorage.app",
+  messagingSenderId: "205689591607",
+  appId: "1:205689591607:web:a95454d30e1ec38c08acb2",
+  measurementId: "G-CNT6DYQRFW"
+};
+
 // ═══════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════
 const OPT_COLORS = ['#f0e040','#ff5e5e','#5ef0b8','#5eaaff','#ff9f40','#c65eff','#ff5ea8','#5effd6'];
+
 let role = 'player';
 let db = null;
 let roomRef = null;
@@ -465,6 +478,13 @@ let roomCode = '';
 let playerName = '';
 let hasVoted = false;
 let adminPassword = '';
+
+let playerId = localStorage.getItem("playerId");
+
+if (!playerId) {
+  playerId = crypto.randomUUID();
+  localStorage.setItem("playerId", playerId);
+}
 
 // ─── ROLE SWITCH ───
 function setRole(r) {
@@ -476,82 +496,112 @@ function setRole(r) {
 }
 
 // ═══════════════════════════════════════════
-//  FIREBASE INIT
+//  FIREBASE INIT – JEDINÁ VERZE
 // ═══════════════════════════════════════════
-function initFirebase(apiKey, dbUrl) {
-  if (firebase.apps.length) {
-    firebase.app().delete().then(() => _initFB(apiKey, dbUrl));
-  } else {
-    _initFB(apiKey, dbUrl);
+
+function initFirebase(config) {
+  if (!firebase.apps.length) {
+    firebase.initializeApp(config);
   }
-}
-function _initFB(apiKey, dbUrl) {
-  firebase.initializeApp({ apiKey, databaseURL: dbUrl });
   db = firebase.database();
-  document.getElementById('connectionBadge').textContent = 'live';
-  document.getElementById('connectionBadge').style.color = '#5ef0b8';
 }
 
+
 // ═══════════════════════════════════════════
-//  PLAYER FLOW
+//  PLAYER FLOW — FINÁLNÍ OPRAVENÁ VERZE
 // ═══════════════════════════════════════════
+
 async function playerJoin() {
   playerName = document.getElementById('playerName').value.trim();
   const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-  if (!playerName || !code) return alert('Vyplň jméno a kód místnosti!');
 
-  // Need firebase – try to detect config from room
-  // Player needs firebase URL & key. Simplest: store it in room on Firebase or ask user.
-  // For simplicity: player must also know the Firebase URL.
-  // We'll embed a prompt for it if db not yet set.
-  if (!db) {
-    const fbUrl = prompt('Zadej Firebase Database URL (dostaneš od admina):');
-    const fbKey = prompt('Zadej Firebase API Key:');
-    if (!fbUrl || !fbKey) return;
-    initFirebase(fbKey.trim(), fbUrl.trim());
-    await new Promise(r => setTimeout(r, 600));
+  if (!playerName || !code) {
+    alert('Vyplň jméno a kód místnosti!');
+    return;
   }
+
+  // 1) Dočasné připojení pro načtení configu
+  const tempApp = firebase.initializeApp(
+    { databaseURL: "https://serpovanigit-default-rtdb.europe-west1.firebasedatabase.app" },
+    "temp"
+  );
+  const tempDb = tempApp.database();
+
+  // 2) Načtení configu z místnosti
+  const metaSnap = await tempDb.ref('rooms/' + code + '/meta/firebaseConfig').once('value');
+  const cfg = metaSnap.val();
+
+  if (!cfg) {
+    alert('Místnost nemá uložený Firebase config. Admin musí místnost znovu vytvořit.');
+    await tempApp.delete();
+    return;
+  }
+
+  // 3) Smazání dočasné appky
+  await tempApp.delete();
+
+  // 4) Inicializace skutečné Firebase appky
+  initFirebase(cfg);
 
   roomCode = code;
   roomRef = db.ref('rooms/' + roomCode);
 
-  // Check room exists
+  // 5) Ověření místnosti
   const snap = await roomRef.once('value');
-  if (!snap.exists()) return alert('Místnost nenalezena. Zkontroluj kód.');
+  if (!snap.exists()) {
+    alert('Místnost nenalezena.');
+    return;
+  }
 
-  // Register participant
-  const safeKey = playerName.replace(/[.#$/\[\]]/g, '_');
-  await roomRef.child('participants/' + safeKey).set({ name: playerName, joined: Date.now() });
+  // 6) Registrace hráče
+  const safeKey = playerId;
+  const playerRef = roomRef.child('participants/' + safeKey);
 
+  await playerRef.set({
+    name: playerName,
+    joined: Date.now()
+  });
+
+  // 7) Automatické odstranění při odpojení
+  playerRef.onDisconnect().remove();
+
+  // 8) UI
   show('playerJoin', false);
   show('playerWaiting', true);
 
-  // Listen for poll state
+  // 9) Listener na poll
   roomRef.child('poll').on('value', snap => {
     const poll = snap.val();
+
     if (!poll) {
       show('playerVote', false);
       show('playerResults', false);
       show('playerWaiting', true);
       return;
     }
+
     if (poll.status === 'active') {
       show('playerWaiting', false);
       show('playerResults', false);
       show('playerVote', true);
       renderPlayerVote(poll);
-    } else if (poll.status === 'ended') {
+      return;
+    }
+
+    if (poll.status === 'ended') {
       show('playerVote', false);
       show('playerWaiting', false);
       show('playerResults', true);
       renderPlayerResults(poll);
+      return;
     }
   });
 
-  // Listen for participants
+  // 10) Listener na hráče
   roomRef.child('participants').on('value', snap => {
     const parts = snap.val() || {};
-    renderParticipants('playerParticipantsList', Object.values(parts).map(p => p.name));
+    const names = Object.values(parts).map(p => p.name);
+    renderParticipants('playerParticipantsList', names);
   });
 }
 
@@ -559,69 +609,135 @@ function renderPlayerVote(poll) {
   hasVoted = false;
   document.getElementById('playerQuestion').textContent = poll.question;
   document.getElementById('votedMsg').classList.add('hidden');
+
   const el = document.getElementById('playerOptions');
   el.innerHTML = '';
+
   poll.options.forEach((opt, i) => {
     const btn = document.createElement('button');
     btn.className = 'vote-option';
     btn.style.background = OPT_COLORS[i % OPT_COLORS.length];
-    btn.style.color = '#000';
     btn.textContent = opt;
-    btn.onclick = () => castVote(i, poll.options.length);
+    btn.onclick = () => castVote(i);
     el.appendChild(btn);
   });
 }
 
-async function castVote(optionIndex, totalOptions) {
+async function castVote(optionIndex) {
   if (hasVoted) return;
+
+  const voteRef = roomRef.child(`poll/voters/${playerId}`);
+
+  const snap = await voteRef.once('value');
+  if (snap.exists()) {
+    alert('Už jsi hlasoval.');
+    return;
+  }
+
   hasVoted = true;
   document.querySelectorAll('.vote-option').forEach(b => b.disabled = true);
   document.getElementById('votedMsg').classList.remove('hidden');
-  await roomRef.child('poll/votes/' + optionIndex).transaction(v => (v || 0) + 1);
+
+  await voteRef.set(optionIndex);
+  await roomRef.child(`poll/votes/${optionIndex}`).transaction(v => (v || 0) + 1);
 }
 
 function renderPlayerResults(poll) {
   renderResultBars('playerResultBars', poll);
 }
 
+
 // ═══════════════════════════════════════════
-//  ADMIN FLOW
+//  ADMIN FLOW — FINÁLNÍ OPRAVENÁ VERZE
 // ═══════════════════════════════════════════
+
 function adminLogin() {
   adminPassword = document.getElementById('adminPassword').value;
   const fbUrl = document.getElementById('firebaseUrl').value.trim();
   const fbKey = document.getElementById('firebaseApiKey').value.trim();
   roomCode = document.getElementById('adminRoomCode').value.trim().toUpperCase();
-  if (!adminPassword || !fbUrl || !fbKey || !roomCode) return alert('Vyplň vše!');
 
-  initFirebase(fbKey, fbUrl);
-  setTimeout(() => {
-    roomRef = db.ref('rooms/' + roomCode);
-    // Init room
-    roomRef.child('meta').set({ code: roomCode, created: Date.now() });
+  if (!adminPassword || !fbUrl || !fbKey || !roomCode) {
+    alert('Vyplň vše!');
+    return;
+  }
 
-    show('adminLogin', false);
-    show('adminDash', true);
-    document.getElementById('adminRoomDisplay').textContent = roomCode;
+  // 1) Inicializace Firebase
+  initFirebase({
+    apiKey: fbKey,
+    databaseURL: fbUrl
+  });
 
-    // Listen participants
-    roomRef.child('participants').on('value', snap => {
-      const parts = snap.val() || {};
-      const names = Object.values(parts).map(p => p.name);
-      document.getElementById('adminParticipantCount').textContent = names.length;
-      renderParticipants('adminParticipantsList', names);
-    });
+  roomRef = db.ref('rooms/' + roomCode);
 
-    // Listen poll state
-    roomRef.child('poll').on('value', snap => {
-      const poll = snap.val();
-      if (poll && poll.status === 'active') {
-        show('adminResultsCard', true);
-        renderAdminResults(poll);
-      }
-    });
-  }, 800);
+  // 2) Uložení meta + configu do místnosti
+  roomRef.child('meta').set({
+    code: roomCode,
+    created: Date.now(),
+    firebaseConfig: {
+      apiKey: fbKey,
+      databaseURL: fbUrl
+    }
+  });
+
+  // 3) UI přepnutí
+  show('adminLogin', false);
+  show('adminDash', true);
+  document.getElementById('adminRoomDisplay').textContent = roomCode;
+
+  // 4) Listener na hráče
+  roomRef.child('participants').on('value', snap => {
+    const parts = snap.val() || {};
+    const names = Object.values(parts).map(p => p.name);
+    document.getElementById('adminParticipantCount').textContent = names.length;
+    renderParticipants('adminParticipantsList', names);
+  });
+
+  // 5) Listener na poll
+  roomRef.child('poll').on('value', snap => {
+    const poll = snap.val();
+
+    if (!poll) {
+      show('adminResultsCard', false);
+      return;
+    }
+
+    if (poll.status === 'active') {
+      show('adminResultsCard', true);
+      renderAdminResults(poll);
+      return;
+    }
+
+    if (poll.status === 'ended') {
+      show('adminResultsCard', true);
+      renderAdminResults(poll);
+      return;
+    }
+  });
 }
+
+// ═══════════════════════════════════════════
+//  RESET MÍSTNOSTI
+// ═══════════════════════════════════════════
+
+async function resetRoom() {
+  if (!roomRef) {
+    alert('Místnost není načtena.');
+    return;
+  }
+
+  const ok = confirm('Opravdu chceš resetovat místnost? Všechna data budou smazána.');
+  if (!ok) return;
+
+  await roomRef.child('participants').remove();
+  await roomRef.child('poll').remove();
+
+  alert('Místnost byla resetována.');
+}
+
+// ═══════════════════════════════════════════
+//  SPRÁVA MOŽNOSTÍ
+// ═══════════════════════════════════════════
 
 function addOption() {
   const list = document.getElementById('optionsList');
@@ -631,75 +747,139 @@ function addOption() {
   div.innerHTML = `<input type="text" placeholder="Možnost ${idx}"><button onclick="removeOption(this)">✕</button>`;
   list.appendChild(div);
 }
+
 function removeOption(btn) {
   const list = document.getElementById('optionsList');
   if (list.children.length <= 2) return;
   btn.closest('.option-row').remove();
 }
 
+// ═══════════════════════════════════════════
+//  SPUŠTĚNÍ HLASOVÁNÍ
+// ═══════════════════════════════════════════
+
 async function launchPoll() {
   const question = document.getElementById('questionInput').value.trim();
   const inputs = document.querySelectorAll('#optionsList .option-row input');
   const options = [...inputs].map(i => i.value.trim()).filter(Boolean);
-  if (!question || options.length < 2) return alert('Zadej otázku a aspoň 2 možnosti!');
 
+  if (!question || options.length < 2) {
+    alert('Zadej otázku a aspoň 2 možnosti!');
+    return;
+  }
+
+  // Zkontroluj, jestli už neběží poll
+  const snap = await roomRef.child('poll/status').once('value');
+  if (snap.val() === 'active') {
+    alert('Hlasování už běží.');
+    return;
+  }
+
+  // Vyčisti staré hlasování
+  await roomRef.child('poll').remove();
+
+  // Připrav nové hlasování
   const votes = {};
   options.forEach((_, i) => votes[i] = 0);
 
-  await roomRef.child('poll').set({ question, options, votes, status: 'active', started: Date.now() });
+  await roomRef.child('poll').set({
+    question,
+    options,
+    votes,
+    voters: {},
+    status: 'active',
+    started: Date.now()
+  });
+
   show('adminResultsCard', true);
 }
 
+// ═══════════════════════════════════════════
+//  UKONČENÍ HLASOVÁNÍ
+// ═══════════════════════════════════════════
+
 async function endPoll() {
+  const snap = await roomRef.child('poll/status').once('value');
+  if (snap.val() !== 'active') {
+    alert('Žádné aktivní hlasování.');
+    return;
+  }
+
   await roomRef.child('poll/status').set('ended');
+  await roomRef.child('poll/ended').set(Date.now());
+
   show('adminResultsCard', false);
 }
+
+// ═══════════════════════════════════════════
+//  ADMIN VÝSLEDKY
+// ═══════════════════════════════════════════
 
 function renderAdminResults(poll) {
   const votes = poll.votes || {};
   const total = Object.values(votes).reduce((a, b) => a + b, 0);
-  document.getElementById('voteCountLabel').textContent = total + ' hlas' + (total === 1 ? '' : total < 5 ? 'y' : 'ů');
+
+  document.getElementById('voteCountLabel').textContent =
+    total + ' hlas' + (total === 1 ? '' : total < 5 ? 'y' : 'ů');
+
   renderResultBars('adminResultBars', poll);
 }
 
+
 // ═══════════════════════════════════════════
-//  SHARED HELPERS
+//  SHARED HELPERS — FINÁLNÍ VERZE
 // ═══════════════════════════════════════════
+
 function renderResultBars(containerId, poll) {
   const el = document.getElementById(containerId);
   if (!el) return;
+
   const votes = poll.votes || {};
   const total = Object.values(votes).reduce((a, b) => a + b, 0);
+
   el.innerHTML = '';
+
   (poll.options || []).forEach((opt, i) => {
     const count = votes[i] || 0;
-    const pct = total > 0 ? Math.round(count / total * 100) : 0;
+    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+
     el.innerHTML += `
       <div class="result-bar-wrap">
         <div class="result-label-row">
-          <span>${opt}</span>
-          <span>${count} hlas${count===1?'':count<5?'y':'ů'} · ${pct}%</span>
+          <span>${escHtml(opt)}</span>
+          <span>${count} hlas${count === 1 ? '' : count < 5 ? 'y' : 'ů'} · ${pct}%</span>
         </div>
         <div class="bar-bg">
-          <div class="bar-fill" style="width:${pct}%;background:${OPT_COLORS[i%OPT_COLORS.length]}"></div>
+          <div class="bar-fill" style="width:${pct}%; background:${OPT_COLORS[i % OPT_COLORS.length]}"></div>
         </div>
-      </div>`;
+      </div>
+    `;
   });
 }
 
 function renderParticipants(containerId, names) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  el.innerHTML = names.map(n =>
-    `<div class="participant-chip"><div class="participant-dot"></div>${escHtml(n)}</div>`
-  ).join('');
+
+  el.innerHTML = names
+    .map(n => `
+      <div class="participant-chip">
+        <div class="participant-dot"></div>
+        ${escHtml(n)}
+      </div>
+    `)
+    .join('');
 }
 
 function show(id, visible) {
   document.getElementById(id).classList.toggle('hidden', !visible);
 }
+
 function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 </script>
 </body>
