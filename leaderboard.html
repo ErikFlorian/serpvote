@@ -243,14 +243,20 @@ async function init() {
   const db = firebase.database();
   const roomRef = db.ref("rooms/" + roomCode);
 
-  roomRef.child("poll").on("value", snap => {
-    const poll = snap.val();
-    if (!poll) return;
+const pollRef = roomRef.child("poll");
 
-    if (poll.status === "ended") {
-      showWinner(poll);
-      return;
-    }
+pollRef.on("value", snap => {
+  const poll = snap.val();
+  if (!poll) return;
+
+  if (poll.status === "ended") {
+    pollRef.off(); // 🔥 ZASTAVÍ realtime listener
+    showWinner(poll);
+    return;
+  }
+
+  renderLeaderboard(poll);
+});
 
     renderLeaderboard(poll);
   });
