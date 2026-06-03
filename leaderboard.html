@@ -12,6 +12,7 @@
     padding: 20px;
     max-width: 700px;
     margin: auto;
+    overflow-x: hidden;
   }
 
   h1 {
@@ -61,30 +62,46 @@
     transition: width 0.35s ease;
   }
 
-  /* WINNER ANIMATION — EPIC VERSION */
+  /* WINNER ANIMATION — ULTIMATE SHOWTIME */
   .winner-anim {
     text-align: center;
     margin-top: 120px;
-    animation: fadeIn 1.4s ease forwards;
+    animation: fadeIn 2s ease forwards;
+    position: relative;
+  }
+
+  /* Light rays behind winner */
+  .winner-anim::before {
+    content: "";
+    position: absolute;
+    top: -50px;
+    left: 50%;
+    width: 600px;
+    height: 600px;
+    transform: translateX(-50%);
+    background: radial-gradient(circle, rgba(255,255,200,0.25), transparent 70%);
+    filter: blur(40px);
+    animation: glowPulse 4s ease-in-out infinite;
   }
 
   .winner-name {
-    font-size: 3.2rem;
+    font-size: 3.6rem;
     font-weight: 700;
     color: white;
     opacity: 0;
-    animation: softPop 1.2s ease forwards;
-    text-shadow: 0 0 25px rgba(255,255,255,0.25);
+    animation: softPop 1.6s ease forwards, pulse 3s ease-in-out infinite 1.6s;
+    text-shadow: 0 0 35px rgba(255,255,200,0.4), 0 0 60px rgba(255,255,200,0.2);
   }
 
   .winner-emojis {
-    font-size: 2.5rem;
+    font-size: 2.8rem;
     margin-top: 25px;
     opacity: 0;
-    animation: floatUp 2s ease 0.8s forwards;
+    animation: floatUp 2.4s ease 0.8s forwards, emojiWave 3s ease-in-out infinite 2.4s;
     filter: drop-shadow(0 0 10px rgba(255,255,255,0.3));
   }
 
+  /* Tie names */
   .tie-name {
     opacity: 0;
     animation: floatUp 1.4s ease forwards;
@@ -94,20 +111,55 @@
     text-shadow: 0 0 15px rgba(255,255,255,0.2);
   }
 
+  /* Confetti */
+  .confetti {
+    position: fixed;
+    top: -10px;
+    width: 10px;
+    height: 14px;
+    background: hsl(var(--hue), 80%, 60%);
+    opacity: 0.9;
+    animation: fall linear forwards;
+    border-radius: 2px;
+  }
+
+  @keyframes fall {
+    to {
+      transform: translateY(110vh) rotate(360deg);
+      opacity: 0.6;
+    }
+  }
+
+  /* Animations */
   @keyframes fadeIn {
     from { opacity: 0; transform: scale(0.97); }
     to   { opacity: 1; transform: scale(1); }
   }
 
   @keyframes softPop {
-    0%   { transform: scale(0.6); opacity: 0; }
-    60%  { transform: scale(1.08); opacity: 1; }
+    0%   { transform: scale(0.5); opacity: 0; }
+    60%  { transform: scale(1.12); opacity: 1; }
     100% { transform: scale(1); }
   }
 
   @keyframes floatUp {
     0%   { opacity: 0; transform: translateY(25px); }
     100% { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.05); }
+  }
+
+  @keyframes glowPulse {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 0.8; }
+  }
+
+  @keyframes emojiWave {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-10px); }
   }
 </style>
 
@@ -200,6 +252,19 @@ function renderLeaderboard(poll) {
   });
 }
 
+function spawnConfetti() {
+  for (let i = 0; i < 40; i++) {
+    const c = document.createElement("div");
+    c.className = "confetti";
+    c.style.left = Math.random() * 100 + "vw";
+    c.style.animationDuration = 2 + Math.random() * 3 + "s";
+    c.style.setProperty("--hue", Math.floor(Math.random() * 360));
+    document.body.appendChild(c);
+
+    setTimeout(() => c.remove(), 6000);
+  }
+}
+
 function showWinner(poll) {
   const votes = poll.votes || {};
   const options = poll.options;
@@ -209,6 +274,9 @@ function showWinner(poll) {
   let winners = Object.entries(votes)
     .filter(([i, v]) => v === maxVotes)
     .map(([i]) => options[i]);
+
+  spawnConfetti();
+  setInterval(spawnConfetti, 2500);
 
   if (winners.length > 1) {
     document.body.innerHTML = `
