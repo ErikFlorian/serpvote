@@ -117,10 +117,6 @@
       0 0 60px rgba(255,255,200,0.2),
       0 0 90px rgba(255,255,200,0.15);
     transform-style: preserve-3d;
-  }
-
-  /* 3D POP-OUT */
-  .winner-name {
     transform: perspective(600px) translateZ(40px);
   }
 
@@ -223,40 +219,35 @@ async function init() {
     return;
   }
 
-  const tempApp = firebase.initializeApp(
+  // Load config safely
+  const loader = firebase.initializeApp(
     { databaseURL: "https://serpovanigit-default-rtdb.europe-west1.firebasedatabase.app" },
-    "temp"
+    "loader"
   );
-  const tempDb = tempApp.database();
 
-  const metaSnap = await tempDb.ref("rooms/" + roomCode + "/meta/firebaseConfig").once("value");
+  const metaSnap = await loader.database()
+    .ref("rooms/" + roomCode + "/meta/firebaseConfig")
+    .once("value");
+
   const cfg = metaSnap.val();
 
-  await tempApp.delete();
-
-  if (!cfg) {
-    document.body.innerHTML = "<h2 style='text-align:center;'>Místnost nemá uložený Firebase config.</h2>";
-    return;
+  if (!firebase.apps.find(a => a.name === "main")) {
+    firebase.initializeApp(cfg, "main");
   }
 
-  firebase.initializeApp(cfg);
-  const db = firebase.database();
+  const db = firebase.app("main").database();
   const roomRef = db.ref("rooms/" + roomCode);
+  const pollRef = roomRef.child("poll");
 
-const pollRef = roomRef.child("poll");
+  pollRef.on("value", snap => {
+    const poll = snap.val();
+    if (!poll) return;
 
-pollRef.on("value", snap => {
-  const poll = snap.val();
-  if (!poll) return;
-
-  if (poll.status === "ended") {
-    pollRef.off(); // 🔥 ZASTAVÍ realtime listener
-    showWinner(poll);
-    return;
-  }
-
-  renderLeaderboard(poll);
-});
+    if (poll.status === "ended") {
+      pollRef.off(); // 🔥 STOP realtime updates → winner stays forever
+      showWinner(poll);
+      return;
+    }
 
     renderLeaderboard(poll);
   });
