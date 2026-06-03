@@ -610,9 +610,8 @@ roomRef.child('participants').on('value', snap => {
 
   // vykreslení seznamu hráčů
   const names = Object.values(parts).map(p => p.name);
-  renderParticipants('playerParticipantsList', names);
+  renderPlayerParticipants('playerParticipantsList', names);
 });
-
 
 function renderPlayerVote(poll) {
   hasVoted = false;
