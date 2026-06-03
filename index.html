@@ -597,13 +597,22 @@ async function playerJoin() {
     }
   });
 
-  // 10) Listener na hráče
-  roomRef.child('participants').on('value', snap => {
-    const parts = snap.val() || {};
-    const names = Object.values(parts).map(p => p.name);
-    renderParticipants('playerParticipantsList', names);
-  });
-}
+// 10) Listener na hráče (s detekcí kicku)
+roomRef.child('participants').on('value', snap => {
+  const parts = snap.val() || {};
+
+  // DETEKCE KICKU
+  if (!parts[playerId]) {
+    alert('Byl jsi vyhozen administrátorem.');
+    location.reload();
+    return;
+  }
+
+  // vykreslení seznamu hráčů
+  const names = Object.values(parts).map(p => p.name);
+  renderParticipants('playerParticipantsList', names);
+});
+
 
 function renderPlayerVote(poll) {
   hasVoted = false;
@@ -651,6 +660,26 @@ function renderPlayerResults(poll) {
 //  ADMIN FLOW — FINÁLNÍ OPRAVENÁ VERZE
 // ═══════════════════════════════════════════
 
+function renderParticipants(containerId, partsObj) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  el.innerHTML = Object.entries(partsObj)
+    .map(([id, p]) => `
+      <div class="participant-chip">
+        <div class="participant-dot"></div>
+        ${escHtml(p.name)}
+        <button class="kick-btn" onclick="kickPlayer('${id}')">Kick</button>
+      </div>
+    `)
+    .join('');
+}
+
+function kickPlayer(id) {
+  if (!roomRef) return;
+  roomRef.child('participants/' + id).remove();
+}
+
 function adminLogin() {
   adminPassword = document.getElementById('adminPassword').value;
   const fbUrl = document.getElementById('firebaseUrl').value.trim();
@@ -688,9 +717,8 @@ function adminLogin() {
   // 4) Listener na hráče
   roomRef.child('participants').on('value', snap => {
     const parts = snap.val() || {};
-    const names = Object.values(parts).map(p => p.name);
-    document.getElementById('adminParticipantCount').textContent = names.length;
-    renderParticipants('adminParticipantsList', names);
+    document.getElementById('adminParticipantCount').textContent = Object.keys(parts).length;
+    renderParticipants('adminParticipantsList', parts);
   });
 
   // 5) Listener na poll
@@ -702,19 +730,11 @@ function adminLogin() {
       return;
     }
 
-    if (poll.status === 'active') {
-      show('adminResultsCard', true);
-      renderAdminResults(poll);
-      return;
-    }
-
-    if (poll.status === 'ended') {
-      show('adminResultsCard', true);
-      renderAdminResults(poll);
-      return;
-    }
+    show('adminResultsCard', true);
+    renderAdminResults(poll);
   });
 }
+
 
 // ═══════════════════════════════════════════
 //  RESET MÍSTNOSTI
