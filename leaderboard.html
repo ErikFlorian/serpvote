@@ -62,15 +62,15 @@
     transition: width 0.35s ease;
   }
 
-  /* WINNER ANIMATION — ULTIMATE SHOWTIME */
+  /* WINNER ANIMATION — NO FADE OUT */
   .winner-anim {
     text-align: center;
     margin-top: 120px;
-    animation: fadeIn 2s ease forwards;
     position: relative;
+    opacity: 1;
   }
 
-  /* Light rays behind winner */
+  /* Light rays */
   .winner-anim::before {
     content: "";
     position: absolute;
@@ -105,37 +105,47 @@
     100% { transform: translateX(-50%) translateY(0) rotateX(25deg) rotateY(360deg); }
   }
 
-  /* Winner text */
+  /* WINNER NAME — NO OPACITY ANIMATION */
   .winner-name {
     font-size: 3.6rem;
     font-weight: 700;
     color: white;
-    opacity: 0;
-    animation: softPop 1.6s ease forwards, pulse 3s ease-in-out infinite 1.6s;
+    opacity: 1; /* 🔥 ALWAYS VISIBLE */
+    transform: perspective(600px) translateZ(40px);
+    animation: softPop 1.2s ease forwards, pulse 3s ease-in-out infinite 1.2s;
     text-shadow:
       0 0 25px rgba(255,255,200,0.4),
       0 0 60px rgba(255,255,200,0.2),
       0 0 90px rgba(255,255,200,0.15);
-    transform-style: preserve-3d;
-    transform: perspective(600px) translateZ(40px);
+  }
+
+  @keyframes softPop {
+    0%   { transform: scale(0.5) perspective(600px) translateZ(0); }
+    60%  { transform: scale(1.12) perspective(600px) translateZ(40px); }
+    100% { transform: scale(1) perspective(600px) translateZ(40px); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: perspective(600px) translateZ(40px) scale(1); }
+    50%      { transform: perspective(600px) translateZ(60px) scale(1.06); }
   }
 
   .winner-emojis {
     font-size: 2.8rem;
     margin-top: 25px;
-    opacity: 0;
-    animation: floatUp 2.4s ease 0.8s forwards, emojiWave 3s ease-in-out infinite 2.4s;
+    opacity: 1; /* 🔥 ALWAYS VISIBLE */
+    animation: emojiWave 3s ease-in-out infinite;
     filter: drop-shadow(0 0 10px rgba(255,255,255,0.3));
   }
 
-  /* Tie names */
-  .tie-name {
-    opacity: 0;
-    animation: floatUp 1.4s ease forwards;
-    margin-bottom: 12px;
-    font-size: 2rem;
-    font-weight: 600;
-    text-shadow: 0 0 15px rgba(255,255,255,0.2);
+  @keyframes emojiWave {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-10px); }
+  }
+
+  @keyframes glowPulse {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 0.8; }
   }
 
   /* Confetti */
@@ -155,38 +165,6 @@
       transform: translateY(110vh) rotate(360deg);
       opacity: 0.6;
     }
-  }
-
-  /* Animations */
-  @keyframes fadeIn {
-    from { opacity: 0; transform: scale(0.97); }
-    to   { opacity: 1; transform: scale(1); }
-  }
-
-  @keyframes softPop {
-    0%   { transform: scale(0.5) perspective(600px) translateZ(0); opacity: 0; }
-    60%  { transform: scale(1.12) perspective(600px) translateZ(40px); opacity: 1; }
-    100% { transform: scale(1) perspective(600px) translateZ(40px); }
-  }
-
-  @keyframes floatUp {
-    0%   { opacity: 0; transform: translateY(25px); }
-    100% { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes pulse {
-    0%, 100% { transform: perspective(600px) translateZ(40px) scale(1); }
-    50%      { transform: perspective(600px) translateZ(60px) scale(1.06); }
-  }
-
-  @keyframes glowPulse {
-    0%, 100% { opacity: 0.4; }
-    50%      { opacity: 0.8; }
-  }
-
-  @keyframes emojiWave {
-    0%, 100% { transform: translateY(0); }
-    50%      { transform: translateY(-10px); }
   }
 
   /* WATERMARK */
@@ -215,7 +193,7 @@
 <div id="question" class="question"></div>
 <div id="results"></div>
 
-<!-- WINNER CONTAINER (NEPŘEPISUJE SE BODY!) -->
+<!-- WINNER stays here -->
 <div id="winner"></div>
 
 <div class="watermark">Made by Kxnvra</div>
@@ -238,7 +216,6 @@ async function init() {
     return;
   }
 
-  // Load config safely
   const loader = firebase.initializeApp(
     { databaseURL: "https://serpovanigit-default-rtdb.europe-west1.firebasedatabase.app" },
     "loader"
@@ -255,15 +232,14 @@ async function init() {
   }
 
   const db = firebase.app("main").database();
-  const roomRef = db.ref("rooms/" + roomCode);
-  const pollRef = roomRef.child("poll");
+  const pollRef = db.ref("rooms/" + roomCode + "/poll");
 
   pollRef.on("value", snap => {
     const poll = snap.val();
     if (!poll) return;
 
     if (poll.status === "ended") {
-      pollRef.off(); // 🔥 STOP realtime updates → winner stays forever
+      pollRef.off();
       showWinner(poll);
       return;
     }
@@ -327,7 +303,6 @@ function showWinner(poll) {
 
   const winnerBox = document.getElementById("winner");
 
-  // REMÍZA
   if (winners.length > 1) {
     winnerBox.innerHTML = `
       <div class="winner-anim">
@@ -335,9 +310,8 @@ function showWinner(poll) {
         <div class="winner-name" style="font-size:2.6rem;">
           REMÍZA 🎉
         </div>
-        <div class="winner-emojis" style="font-size:2rem; margin-top:10px;">✨🏆✨</div>
-
-        <div style="margin-top:40px; font-size:1.8rem; line-height:1.8;">
+        <div class="winner-emojis">✨🏆✨</div>
+        <div style="margin-top:40px; font-size:1.8rem;">
           ${winners.map(w => `<div class="tie-name">${w}</div>`).join("")}
         </div>
       </div>
@@ -345,7 +319,6 @@ function showWinner(poll) {
     return;
   }
 
-  // JEDEN VÍTĚZ
   const winner = winners[0];
 
   winnerBox.innerHTML = `
