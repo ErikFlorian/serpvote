@@ -6,8 +6,9 @@
 
 <style>
   body {
+    background: #000;
+    color: white;
     font-family: 'Inter', sans-serif;
-    background: #f5f5f5;
     padding: 20px;
     max-width: 700px;
     margin: auto;
@@ -17,16 +18,22 @@
     font-size: 1.8rem;
     margin-bottom: 1.5rem;
     font-weight: 700;
+    text-align: center;
   }
 
   .question {
     font-size: 1.4rem;
     font-weight: 600;
     margin-bottom: 1.5rem;
+    text-align: center;
   }
 
-  .result-row {
-    margin-bottom: 1.2rem;
+  .result-box {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 15px;
   }
 
   .label {
@@ -39,7 +46,7 @@
   .bar-bg {
     width: 100%;
     height: 22px;
-    background: #e5e5e5;
+    background: #333;
     border-radius: 6px;
     overflow: hidden;
   }
@@ -48,6 +55,15 @@
     height: 100%;
     border-radius: 6px;
     transition: width 0.25s ease;
+  }
+
+  .winner-screen {
+    text-align: center;
+    margin-top: 120px;
+    font-size: 3rem;
+    font-weight: 800;
+    color: white;
+    line-height: 1.4;
   }
 </style>
 
@@ -76,7 +92,7 @@ function getRoomCode() {
 async function init() {
   const roomCode = getRoomCode();
   if (!roomCode) {
-    document.body.innerHTML = "<h2>Chybí ?room=KOD v URL</h2>";
+    document.body.innerHTML = "<h2 style='text-align:center;'>Chybí ?room=KOD v URL</h2>";
     return;
   }
 
@@ -93,7 +109,7 @@ async function init() {
   await tempApp.delete();
 
   if (!cfg) {
-    document.body.innerHTML = "<h2>Místnost nemá uložený Firebase config.</h2>";
+    document.body.innerHTML = "<h2 style='text-align:center;'>Místnost nemá uložený Firebase config.</h2>";
     return;
   }
 
@@ -105,9 +121,10 @@ async function init() {
   // 3) Listener na poll
   roomRef.child("poll").on("value", snap => {
     const poll = snap.val();
-    if (!poll) {
-      document.getElementById("question").textContent = "Čeká se na otázku…";
-      document.getElementById("results").innerHTML = "";
+    if (!poll) return;
+
+    if (poll.status === "ended") {
+      showWinner(poll);
       return;
     }
 
@@ -129,7 +146,7 @@ function renderLeaderboard(poll) {
     const pct = total > 0 ? Math.round((count/total)*100) : 0;
 
     container.innerHTML += `
-      <div class="result-row">
+      <div class="result-box">
         <div class="label">
           <span>${opt}</span>
           <span>${count} hlasy · ${pct}%</span>
@@ -140,6 +157,29 @@ function renderLeaderboard(poll) {
       </div>
     `;
   });
+}
+
+function showWinner(poll) {
+  const votes = poll.votes || {};
+  let maxIndex = 0;
+  let maxVotes = -1;
+
+  Object.entries(votes).forEach(([i, v]) => {
+    if (v > maxVotes) {
+      maxVotes = v;
+      maxIndex = i;
+    }
+  });
+
+  const winner = poll.options[maxIndex];
+
+  document.body.innerHTML = `
+    <div class="winner-screen">
+      🎉✨🏆<br>
+      ${winner}<br>
+      🏆✨🎉
+    </div>
+  `;
 }
 
 init();
